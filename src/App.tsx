@@ -108,13 +108,19 @@ export default function App() {
         profileStrength?: number;
         assignedAgent?: PublicUser | null;
       }>('/api/auth/me');
-      setUser(me.user);
-      setProfileStrength(me.profileStrength || 0);
-      setAssignedAgent(me.assignedAgent || null);
       if (me.user) {
-        const notifs = await apiFetch<NotificationRecord[]>('/api/notifications');
-        setNotifications(notifs);
+        setUser(me.user);
+        setProfileStrength(me.profileStrength || 0);
+        setAssignedAgent(me.assignedAgent || null);
+        try {
+          const notifs = await apiFetch<NotificationRecord[]>('/api/notifications');
+          setNotifications(notifs);
+        } catch {
+          setNotifications([]);
+        }
       } else {
+        setAuthToken(null);
+        setUser(null);
         setNotifications([]);
       }
     } catch {
@@ -193,11 +199,17 @@ export default function App() {
   }
 
   async function handleLogout() {
-    await apiFetch('/api/auth/logout', { method: 'POST' });
-    setAuthToken(null);
-    setUser(null);
-    setNotifications([]);
-    setActiveView('home');
+    try {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // Ignore network errors during logout
+    } finally {
+      setAuthToken(null);
+      setUser(null);
+      setAssignedAgent(null);
+      setNotifications([]);
+      setActiveView('home');
+    }
   }
 
   async function handleToggleSaveJob(jobId: string) {
@@ -627,7 +639,7 @@ export default function App() {
                   <div className="mt-5 grid gap-4 md:grid-cols-2">
                     {jobs.map((job) => {
                       const wpBadge = getWorkPermitBadge(job.workPermitSupport);
-                      const isSaved = user?.savedJobIds.includes(job.id) ?? false;
+                      const isSaved = (user?.savedJobIds || []).includes(job.id);
                       return (
                         <div
                           key={job.id}
@@ -1118,7 +1130,9 @@ export default function App() {
             setProfileStrength(strength);
             setAuthModalMode(null);
             setActiveView('dashboard');
-            loadSession();
+            apiFetch<NotificationRecord[]>('/api/notifications')
+              .then((notifs) => setNotifications(notifs))
+              .catch(() => setNotifications([]));
           }}
         />
       )}
@@ -1129,7 +1143,7 @@ export default function App() {
           user={user}
           currency={currency}
           cadToKesRate={cadToKesRate}
-          isSaved={user?.savedJobIds.includes(selectedJob.id) ?? false}
+          isSaved={(user?.savedJobIds || []).includes(selectedJob.id)}
           onToggleSave={handleToggleSaveJob}
           onRequireAuth={() => {
             setSelectedJob(null);

@@ -50,6 +50,9 @@ function extractToken(req: Request): string | null {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return authHeader.slice(7).trim();
   }
+  if (typeof req.query.token === 'string' && req.query.token.trim()) {
+    return req.query.token.trim();
+  }
   const cookies = parseCookies(req.headers.cookie);
   return cookies['ccc_token'] || null;
 }
@@ -60,7 +63,34 @@ function attachUser(req: AuthRequest, _res: Response, next: NextFunction): void 
     const payload = verifyToken(token);
     if (payload) {
       const store = getStore();
-      const user = store.users.find((u) => u.id === payload.uid);
+      let user = store.users.find((u) => u.id === payload.uid);
+      if (!user && payload.usr) {
+        user = {
+          id: payload.usr.id,
+          email: payload.usr.email,
+          passwordHash: '',
+          fullName: payload.usr.fullName,
+          role: payload.usr.role,
+          phone: payload.usr.phone || '',
+          country: payload.usr.country || 'Kenya',
+          avatarInitials: payload.usr.avatarInitials || 'CC',
+          preferredProvinces: [],
+          workExperience: [],
+          education: [],
+          skills: [],
+          savedJobIds: [],
+          subscriptionTier: payload.usr.subscriptionTier || 'free',
+          assignedAgentId: payload.usr.assignedAgentId,
+          companyName: payload.usr.companyName,
+          companyLogo: payload.usr.companyLogo,
+          companyProvince: payload.usr.companyProvince,
+          companyCity: payload.usr.companyCity,
+          employerVerified: payload.usr.employerVerified,
+          createdAt: payload.usr.createdAt || new Date().toISOString(),
+        };
+        store.users.push(user);
+        saveStore();
+      }
       if (user) {
         req.authUser = user;
       }
@@ -91,15 +121,24 @@ function requireRoles(...roles: UserRole[]) {
   };
 }
 
-function setSessionCookie(res: Response, token: string): void {
+function isHttpsRequest(req: Request): boolean {
+  const proto = String(req.headers['x-forwarded-proto'] || '').toLowerCase();
+  return req.secure || proto.includes('https');
+}
+
+function setSessionCookie(req: Request, res: Response, token: string): void {
+  const https = isHttpsRequest(req);
+  const attrs = https ? 'SameSite=None; Secure' : 'SameSite=Lax';
   res.setHeader(
     'Set-Cookie',
-    `ccc_token=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`
+    `ccc_token=${encodeURIComponent(token)}; Path=/; HttpOnly; ${attrs}; Max-Age=${7 * 24 * 60 * 60}`
   );
 }
 
-function clearSessionCookie(res: Response): void {
-  res.setHeader('Set-Cookie', 'ccc_token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
+function clearSessionCookie(req: Request, res: Response): void {
+  const https = isHttpsRequest(req);
+  const attrs = https ? 'SameSite=None; Secure' : 'SameSite=Lax';
+  res.setHeader('Set-Cookie', `ccc_token=; Path=/; HttpOnly; ${attrs}; Max-Age=0`);
 }
 
 function getInitials(name: string): string {
@@ -120,6 +159,7 @@ function assignBestAgent(): UserRecord | undefined {
 
 export function createApiApp(): express.Express {
   const app = express();
+  app.set('trust proxy', 1);
   app.use(express.json({ limit: '12mb' }));
   app.use(attachUser);
 
@@ -206,7 +246,7 @@ export function createApiApp(): express.Express {
     saveStore();
 
     const token = signToken(newUser);
-    setSessionCookie(res, token);
+    setSessionCookie(req, res, token);
     const publicUser = toPublicUser(newUser);
     res.status(201).json({
       token,
@@ -229,7 +269,7 @@ export function createApiApp(): express.Express {
       return;
     }
     const token = signToken(user);
-    setSessionCookie(res, token);
+    setSessionCookie(req, res, token);
     const docCount = store.documents.filter((d) => d.userId === user.id).length;
     const publicUser = toPublicUser(user);
     res.json({
@@ -239,8 +279,8 @@ export function createApiApp(): express.Express {
     });
   });
 
-  app.post('/api/auth/logout', (_req: AuthRequest, res: Response) => {
-    clearSessionCookie(res);
+  app.post('/api/auth/logout', (req: AuthRequest, res: Response) => {
+    clearSessionCookie(req, res);
     res.json({ ok: true });
   });
 

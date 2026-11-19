@@ -1,16 +1,33 @@
 import type { WorkPermitSupport } from '../types.ts';
 
 const TOKEN_KEY = 'ccc_auth_token';
+let memoryToken: string | null = null;
 
 export function getAuthToken(): string | null {
+  if (memoryToken) return memoryToken;
   try {
-    return localStorage.getItem(TOKEN_KEY);
+    const ls = localStorage.getItem(TOKEN_KEY);
+    if (ls) {
+      memoryToken = ls;
+      return ls;
+    }
   } catch {
-    return null;
+    // Ignore storage errors in restricted contexts
   }
+  try {
+    const ss = sessionStorage.getItem(TOKEN_KEY);
+    if (ss) {
+      memoryToken = ss;
+      return ss;
+    }
+  } catch {
+    // Ignore storage errors in restricted contexts
+  }
+  return null;
 }
 
 export function setAuthToken(token: string | null): void {
+  memoryToken = token;
   try {
     if (token) {
       localStorage.setItem(TOKEN_KEY, token);
@@ -20,6 +37,22 @@ export function setAuthToken(token: string | null): void {
   } catch {
     // Ignore storage errors in restricted contexts
   }
+  try {
+    if (token) {
+      sessionStorage.setItem(TOKEN_KEY, token);
+    } else {
+      sessionStorage.removeItem(TOKEN_KEY);
+    }
+  } catch {
+    // Ignore storage errors in restricted contexts
+  }
+}
+
+export function buildAuthorizedUrl(path: string): string {
+  const token = getAuthToken();
+  if (!token) return path;
+  const sep = path.includes('?') ? '&' : '?';
+  return `${path}${sep}token=${encodeURIComponent(token)}`;
 }
 
 export async function apiFetch<T>(url: string, options: RequestInit = {}): Promise<T> {
@@ -36,6 +69,7 @@ export async function apiFetch<T>(url: string, options: RequestInit = {}): Promi
   }
 
   const res = await fetch(url, {
+    credentials: 'include',
     ...options,
     headers,
   });

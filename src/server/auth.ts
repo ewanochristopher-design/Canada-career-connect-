@@ -19,10 +19,29 @@ export function verifyPassword(password: string, storedHash: string): boolean {
   return crypto.timingSafeEqual(actualBuf, expectedBuf);
 }
 
+export interface TokenUserSnapshot {
+  id: string;
+  email: string;
+  fullName: string;
+  role: UserRole;
+  phone: string;
+  country: string;
+  avatarInitials: string;
+  assignedAgentId?: string;
+  companyName?: string;
+  companyLogo?: string;
+  companyProvince?: UserRecord['companyProvince'];
+  companyCity?: string;
+  employerVerified?: boolean;
+  subscriptionTier: UserRecord['subscriptionTier'];
+  createdAt: string;
+}
+
 interface TokenPayload {
   uid: string;
   role: UserRole;
   exp: number;
+  usr?: TokenUserSnapshot;
 }
 
 function base64UrlEncode(input: string | Buffer): string {
@@ -44,6 +63,23 @@ export function signToken(user: UserRecord): string {
     uid: user.id,
     role: user.role,
     exp: Date.now() + 7 * 24 * 60 * 60 * 1000,
+    usr: {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
+      phone: user.phone,
+      country: user.country,
+      avatarInitials: user.avatarInitials,
+      assignedAgentId: user.assignedAgentId,
+      companyName: user.companyName,
+      companyLogo: user.companyLogo,
+      companyProvince: user.companyProvince,
+      companyCity: user.companyCity,
+      employerVerified: user.employerVerified,
+      subscriptionTier: user.subscriptionTier,
+      createdAt: user.createdAt,
+    },
   };
   const payload = base64UrlEncode(JSON.stringify(payloadObj));
   const signature = base64UrlEncode(

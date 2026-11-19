@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import {
   apiFetch,
+  buildAuthorizedUrl,
   CANADIAN_PROVINCES,
   formatJobSalary,
   getWorkPermitBadge,
@@ -168,6 +169,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           ? 'employer_jobs'
           : 'dashboard_home'
   );
+
+  useEffect(() => {
+    setTab(
+      user.role === 'admin'
+        ? 'admin_overview'
+        : user.role === 'agent'
+          ? 'agent_leads'
+          : user.role === 'employer'
+            ? 'employer_jobs'
+            : 'dashboard_home'
+    );
+  }, [user.id, user.role]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showNotifs, setShowNotifs] = useState(false);
   const [dashSearch, setDashSearch] = useState('');
@@ -1068,7 +1081,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                   <div className="mt-4 space-y-3">
                     {filteredJobs.slice(0, 3).map((job) => {
-                      const saved = user.savedJobIds.includes(job.id);
+                      const saved = (user.savedJobIds || []).includes(job.id);
                       return (
                         <div
                           key={job.id}
@@ -1142,7 +1155,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 {filteredJobs.map((job) => {
                   const badge = getWorkPermitBadge(job.workPermitSupport);
-                  const saved = user.savedJobIds.includes(job.id);
+                  const saved = (user.savedJobIds || []).includes(job.id);
                   return (
                     <div
                       key={job.id}
@@ -1314,7 +1327,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </div>
                         <div className="flex items-center gap-2">
                           <a
-                            href={`/api/documents/${doc.id}/download`}
+                            href={buildAuthorizedUrl(`/api/documents/${doc.id}/download`)}
                             className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:text-[#0A1D3D]"
                           >
                             <Download className="h-3.5 w-3.5" />
@@ -1997,6 +2010,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           )}
 
           {/* ==================== ADMIN OVERVIEW ==================== */}
+          {tab === 'admin_overview' && !adminOverview && (
+            <div className="flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-white p-8 text-sm text-slate-500 shadow-sm">
+              <Loader2 className="h-4 w-4 animate-spin text-[#D62839]" />
+              <span>Loading administrator compliance overview...</span>
+            </div>
+          )}
           {tab === 'admin_overview' && adminOverview && (
             <div className="space-y-6">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -2067,14 +2086,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </h3>
                   <div className="flex flex-wrap gap-3 pt-2">
                     <a
-                      href="/api/admin/export/applicants"
+                      href={buildAuthorizedUrl('/api/admin/export/applicants')}
                       className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-[#0A1D3D]"
                     >
                       <Download className="h-4 w-4" />
                       Export Applicants CSV
                     </a>
                     <a
-                      href="/api/admin/export/financials"
+                      href={buildAuthorizedUrl('/api/admin/export/financials')}
                       className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-[#0A1D3D]"
                     >
                       <Download className="h-4 w-4" />
