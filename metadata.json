@@ -1,0 +1,6 @@
+{
+  "name": "Canada Career Connect",
+  "description": "International recruitment discovery and Canadian relocation guidance platform helping applicants from Kenya and Africa explore legitimate Canadian job opportunities and connect with recruitment agents.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
